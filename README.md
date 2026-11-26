@@ -20,6 +20,7 @@ or set `ANDROID_HOME`). The first build downloads Gradle dependencies and takes 
 
 | Feature | What it does |
 |---|---|
+| Multiple websites | Press "Add another website" to put up to 20 sites (name + link) in one app. The app opens on a list of them, and Back or "All sites" in the menu returns to the list. With one link the app opens that site directly |
 | Block ads | Blocks requests to ad and tracker networks (built-in list, plus an optional list of 80,000+ domains) and hides common ad containers |
 | Block redirects | Stops navigation to other sites that the user didn't tap, including automatic `intent://` and `market://` redirects |
 | Block pop-ups | Stops `window.open`, new-tab and pop-under ads. Pop-ups to the same site open inside the app |

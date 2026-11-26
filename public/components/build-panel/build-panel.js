@@ -52,8 +52,9 @@ export function BuildPanel(store) {
   function scrollToFirstError(fieldErrors) {
     const first = Object.keys(fieldErrors)[0];
     const node = document.querySelector(`[data-field="${first}"]`);
-    node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    node?.querySelector('input')?.focus({ preventScroll: true });
+    const target = node?.querySelector('.url-bad') || node; // a wrong row in the website list
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    (target?.querySelector('.url-link') || target?.querySelector('input'))?.focus({ preventScroll: true });
   }
 
   async function run() {

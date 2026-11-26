@@ -12,7 +12,9 @@ import android.content.pm.ActivityInfo
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Build
@@ -46,6 +48,7 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -64,6 +67,7 @@ class MainActivity : Activity() {
     private lateinit var progress: ProgressBar
     private lateinit var errorView: LinearLayout
     private var menuButton: ImageButton? = null
+    private var siteList: View? = null
 
     private var themeColor = Color.parseColor("#2563EB")
     private var desktopMode = false
@@ -78,6 +82,9 @@ class MainActivity : Activity() {
     private var lastBackPress = 0L
     private var lastToast = 0L
     private var failedUrl: String? = null
+    private var homeUrl = ""                  // start page of the site being shown
+    private var showingList = false           // multi-site app: the site list is on screen
+    private var clearHistoryOnLoad = false    // forget the previous site once the new one loads
     private val handler = Handler(Looper.getMainLooper())
 
     private val prefs by lazy { getSharedPreferences("webapk", Context.MODE_PRIVATE) }
@@ -99,7 +106,9 @@ class MainActivity : Activity() {
         themeColor = runCatching { Color.parseColor(cfg.themeColor) }.getOrDefault(themeColor)
         desktopMode = prefs.getBoolean("desktop", cfg.desktopMode)
 
+        homeUrl = cfg.url
         Uri.parse(cfg.url).host?.let { siteRoots += rootDomain(it) }
+        for (site in cfg.sites) Uri.parse(site.url).host?.let { siteRoots += rootDomain(it) }
         siteRoots += cfg.allowedDomains
 
         applyOrientation(prefs.getString("orientation", cfg.orientation) ?: cfg.orientation)
@@ -110,14 +119,27 @@ class MainActivity : Activity() {
         setupWindow()
         setupWebView()
 
-        if (savedInstanceState != null) web.restoreState(savedInstanceState)
-        else web.loadUrl(intent?.dataString?.takeIf { it.startsWith("http") } ?: cfg.url)
+        val link = intent?.dataString?.takeIf { it.startsWith("http") }
+        when {
+            savedInstanceState != null -> {
+                homeUrl = savedInstanceState.getString("homeUrl") ?: cfg.url
+                web.restoreState(savedInstanceState)
+                if (savedInstanceState.getBoolean("showingList")) showSiteList()
+            }
+            link != null -> web.loadUrl(link)
+            isMultiSite -> showSiteList()
+            else -> web.loadUrl(cfg.url)
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
+        outState.putString("homeUrl", homeUrl)
+        outState.putBoolean("showingList", showingList)
     }
+
+    private val isMultiSite get() = cfg.sites.size > 1
 
     override fun onResume() { super.onResume(); web.onResume() }
 
@@ -142,7 +164,8 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when {
             customView != null -> hideCustomView()
-            web.canGoBack() -> web.goBack()
+            !showingList && web.canGoBack() -> web.goBack()
+            !showingList && isMultiSite -> showSiteList()
             cfg.doubleBackExit && System.currentTimeMillis() - lastBackPress > 2000 -> {
                 lastBackPress = System.currentTimeMillis()
                 Toast.makeText(this, "Press back again to exit", Toast.LENGTH_SHORT).show()
@@ -221,6 +244,9 @@ class MainActivity : Activity() {
         }
         content.addView(errorView, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
 
+        if (isMultiSite) content.addView(buildSiteList().also { siteList = it },
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+
         if (cfg.floatingMenu) content.addView(buildMenuButton(), FrameLayout.LayoutParams(dp(46), dp(46)).apply {
             gravity = Gravity.BOTTOM or Gravity.END
             setMargins(0, 0, dp(16), dp(24))
@@ -276,6 +302,7 @@ class MainActivity : Activity() {
     private fun showMenu(anchor: View) {
         val pm = PopupMenu(this, anchor)
         val m = pm.menu
+        if (isMultiSite) m.add(0, 10, 0, "All sites")
         m.add(0, 1, 0, "Home")
         m.add(0, 2, 1, "Refresh")
         m.add(0, 3, 2, "Desktop mode").apply { isCheckable = true; isChecked = desktopMode }
@@ -287,7 +314,8 @@ class MainActivity : Activity() {
         m.add(0, 9, 8, "Exit")
         pm.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                1 -> web.loadUrl(cfg.url)
+                10 -> showSiteList()
+                1 -> web.loadUrl(homeUrl)
                 2 -> web.reload()
                 3 -> setDesktopMode(!desktopMode)
                 4 -> {
@@ -304,7 +332,7 @@ class MainActivity : Activity() {
                     web.clearCache(true); web.clearHistory()
                     CookieManager.getInstance().removeAllCookies(null)
                     android.webkit.WebStorage.getInstance().deleteAllData()
-                    web.loadUrl(cfg.url)
+                    if (showingList) web.loadUrl("about:blank") else web.loadUrl(homeUrl)
                     Toast.makeText(this, "Cleared", Toast.LENGTH_SHORT).show()
                 }
                 9 -> finishAndRemoveTask()
@@ -475,8 +503,9 @@ class MainActivity : Activity() {
         }
 
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-            if (cfg.progressBar) progress.visibility = View.VISIBLE
             errorView.visibility = View.GONE
+            if (showingList) return
+            if (cfg.progressBar) progress.visibility = View.VISIBLE
             if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                 view.evaluateJavascript(earlyScript(), null)
             }
@@ -485,6 +514,8 @@ class MainActivity : Activity() {
         override fun onPageFinished(view: WebView, url: String?) {
             swipe.isRefreshing = false
             progress.visibility = View.GONE
+            if (showingList || url == null || url == "about:blank") return
+            if (clearHistoryOnLoad) { clearHistoryOnLoad = false; view.clearHistory() }
             if (initialLoad) {
                 // site redirected on first load (e.g. example.com -> www.example.net): trust it
                 Uri.parse(url ?: "").host?.let { siteRoots += rootDomain(it) }
@@ -494,7 +525,7 @@ class MainActivity : Activity() {
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-            if (request.isForMainFrame) {
+            if (request.isForMainFrame && !showingList) {
                 failedUrl = request.url.toString()
                 swipe.isRefreshing = false
                 errorView.visibility = View.VISIBLE
@@ -563,6 +594,112 @@ class MainActivity : Activity() {
         menuButton?.visibility = View.VISIBLE
         if (!cfg.fullscreen) hideSystemBars(false)
         root.requestApplyInsets()
+    }
+
+    // ---------------------------------------------------------------- multi-site list
+
+    private fun showSiteList() {
+        val list = siteList ?: return
+        showingList = true
+        web.stopLoading()
+        web.loadUrl("about:blank")   // stops sound / video of the site that was open
+        swipe.isRefreshing = false
+        progress.visibility = View.GONE
+        errorView.visibility = View.GONE
+        menuButton?.visibility = View.GONE
+        list.visibility = View.VISIBLE
+    }
+
+    private fun openSite(site: Site) {
+        showingList = false
+        homeUrl = site.url
+        initialLoad = true
+        clearHistoryOnLoad = true   // back from this site's first page returns to the list
+        siteList?.visibility = View.GONE
+        menuButton?.visibility = View.VISIBLE
+        web.loadUrl(site.url)
+    }
+
+    private fun buildSiteList(): View {
+        val dark = cfg.darkMode
+        val pageBg = Color.parseColor(if (dark) "#121212" else "#F5F6F8")
+        val cardBg = if (dark) Color.parseColor("#1E1E1E") else Color.WHITE
+        val cardLine = Color.parseColor(if (dark) "#2C2C2C" else "#E4E7EC")
+        val textColor = if (dark) Color.WHITE else Color.parseColor("#101828")
+        val subColor = Color.parseColor(if (dark) "#9E9E9E" else "#667085")
+        val onTheme = if (isLight(themeColor)) Color.BLACK else Color.WHITE
+
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(28), dp(20), dp(24))
+        }
+        column.addView(TextView(this).apply {
+            text = getString(R.string.app_name)
+            textSize = 26f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(textColor)
+        })
+        column.addView(TextView(this).apply {
+            text = "Choose a site to open"
+            textSize = 15f
+            setTextColor(subColor)
+            setPadding(0, dp(4), 0, dp(20))
+        })
+
+        for (site in cfg.sites) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(14), dp(14), dp(14))
+                val card = GradientDrawable().apply {
+                    cornerRadius = dp(16).toFloat(); setColor(cardBg); setStroke(dp(1), cardLine)
+                }
+                background = RippleDrawable(ColorStateList.valueOf(Color.argb(40, 128, 128, 128)), card, null)
+                isClickable = true
+                isFocusable = true
+                contentDescription = site.name
+                setOnClickListener { openSite(site) }
+            }
+            row.addView(TextView(this).apply {
+                text = site.name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "#"
+                textSize = 18f
+                gravity = Gravity.CENTER
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(onTheme)
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(themeColor) }
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            val texts = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), 0, 0, 0)
+            }
+            texts.addView(TextView(this).apply {
+                text = site.name
+                textSize = 17f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(textColor)
+            })
+            texts.addView(TextView(this).apply {
+                text = Uri.parse(site.url).host?.removePrefix("www.") ?: site.url
+                textSize = 13.5f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(subColor)
+            })
+            row.addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            column.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(10)
+            })
+        }
+
+        return ScrollView(this).apply {
+            setBackgroundColor(pageBg)
+            isFillViewport = true
+            isClickable = true   // keep taps away from the WebView underneath
+            visibility = View.GONE
+            addView(column)
+        }
     }
 
     // ---------------------------------------------------------------- link policy

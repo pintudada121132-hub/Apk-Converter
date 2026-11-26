@@ -4,3 +4,16 @@
 .url-input .input { padding: 13px 14px 13px 42px; font-size: 16px; }
 .url-row .btn { padding-inline: 20px; }
 @media (max-width: 520px) { .url-row { flex-direction: column; } }
+
+/* multiple sites */
+.url-name { flex: 0 0 140px; padding: 13px 14px; font-size: 15px; }
+.url-name[hidden] { display: none; }
+.url-extras { margin-top: 12px; }
+.url-extra-list { display: grid; gap: 10px; }
+.url-extra-list:not(:empty) { margin-bottom: 12px; }
+.url-remove { padding-inline: 14px !important; }
+.url-add[hidden], .url-multi-hint[hidden] { display: none; }
+@media (max-width: 520px) { .url-name { flex-basis: auto; } }
+.url-row-error { display: none; color: var(--danger); font-size: 12.5px; margin-top: 6px; }
+.url-bad .url-row-error { display: block; }
+.url-bad .url-link { border-color: var(--danger); }

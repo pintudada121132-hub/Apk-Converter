@@ -3,9 +3,14 @@ package com.webapk.app
 import android.content.Context
 import org.json.JSONObject
 
+/** One entry of a multi-site app's start list. */
+data class Site(val name: String, val url: String)
+
 /** All settings chosen on the website, read from assets/config.json. */
 data class AppConfig(
     val url: String,
+    val sites: List<Site>,            // 2+ entries: the app opens on a list of these sites
+
     val pullToRefresh: Boolean,
     val desktopMode: Boolean,
     val orientation: String,          // auto | portrait | landscape | sensor
@@ -41,8 +46,17 @@ data class AppConfig(
                     if (d.isNotEmpty()) domains += d
                 }
             }
+            val sites = mutableListOf<Site>()
+            j.optJSONArray("sites")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    val u = o.optString("url").trim()
+                    if (u.startsWith("http")) sites += Site(o.optString("name").trim().ifEmpty { u }, u)
+                }
+            }
             return AppConfig(
                 url = j.optString("url", "https://example.com"),
+                sites = if (sites.size > 1) sites else emptyList(),
                 pullToRefresh = j.optBoolean("pullToRefresh", true),
                 desktopMode = j.optBoolean("desktopMode", false),
                 orientation = j.optString("orientation", "auto"),

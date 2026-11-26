@@ -1,11 +1,23 @@
 import { BUILD_ONLY_FEATURES } from '../config/features.js';
-import { normalizeUrl } from '../utils/url.js';
+import { normalizeUrl, suggestFromUrl } from '../utils/url.js';
 import { foregroundPng, previewPng } from '../utils/icon-render.js';
+
+/** Site list for a multi-site app. A blank name falls back to the site's domain ("News"). */
+function buildSites(state) {
+  const extras = state.extraSites.filter((s) => s.url.trim()); // empty rows are skipped
+  if (!extras.length) return [];
+  return [{ name: state.siteName, url: state.url }, ...extras].map((s) => {
+    const url = normalizeUrl(s.url);
+    const name = s.name.trim() || suggestFromUrl(url)?.name || 'Site';
+    return { name: name.slice(0, 40), url };
+  });
+}
 
 // Turns the form state into the JSON body the build server expects.
 export function buildPayload(state) {
   const config = {
     url: normalizeUrl(state.url),
+    sites: buildSites(state),
     orientation: state.orientation,
     externalLinks: state.externalLinks,
     themeColor: state.themeColor,

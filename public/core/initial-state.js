@@ -6,6 +6,8 @@ for (const group of FEATURE_GROUPS) for (const f of group.items) features[f.key]
 export const initialState = {
   url: '',
   previewUrl: '',
+  siteName: '',           // name of the first site (shown only when there are several)
+  extraSites: [],         // [{ name, url }] more sites: the app then opens on a list of them
   appName: '',
   packageName: '',
   versionName: '1.0.0',

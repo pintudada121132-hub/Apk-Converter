@@ -6,6 +6,12 @@ export function validateForm(state) {
   const urlError = validateUrl(state.url);
   if (urlError) errors.url = urlError;
 
+  for (const [i, site] of state.extraSites.entries()) {
+    if (!site.url.trim() && !site.name.trim()) continue; // empty rows are skipped
+    const error = validateUrl(site.url);
+    if (error) { errors.sites = `Site ${i + 2}: ${error}`; break; }
+  }
+
   const name = state.appName.trim();
   if (!name) errors.appName = 'Give your app a name.';
   else if (name.length > 50) errors.appName = 'Keep the name under 50 characters.';

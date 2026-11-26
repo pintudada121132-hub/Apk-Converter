@@ -132,6 +132,13 @@ function validate(b) {
   const errors = [];
   let url;
   try { url = new URL(b.config.url); if (!/^https?:$/.test(url.protocol)) throw 0; } catch { errors.push('Enter a valid website URL (https://...)'); }
+  const sites = b.config.sites;
+  if (sites !== undefined && !Array.isArray(sites)) errors.push('Invalid site list');
+  else if (sites && sites.length > 20) errors.push('Add at most 20 websites');
+  else (sites || []).forEach((s, i) => {
+    try { if (!/^https?:$/.test(new URL(s.url).protocol)) throw 0; } catch { errors.push(`Site ${i + 1}: enter a valid website URL (https://...)`); }
+    if (typeof s.name !== 'string' || !s.name.trim() || s.name.length > 40) errors.push(`Site ${i + 1}: name must be 1-40 characters`);
+  });
   if (!b.appName || b.appName.length > 50) errors.push('App name must be 1-50 characters');
   if (!/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(b.packageName || '')) errors.push('Invalid package name (e.g. com.mysite.app)');
   if (!/^\d{1,9}$/.test(String(b.versionCode))) errors.push('Version code must be a whole number');
