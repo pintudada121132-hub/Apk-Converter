@@ -1,0 +1,17 @@
+.app-header { position: sticky; top: 0; z-index: 20; background: var(--surface); border-bottom: 1px solid var(--border); }
+.app-header-inner { max-width: 1240px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 34px; height: 34px; border-radius: 10px; background: var(--primary); display: grid; place-items: center; }
+.brand-text b { display: block; font-size: 15.5px; line-height: 1.2; }
+.brand-text small { color: var(--muted); font-size: 12.5px; }
+
+.server-status {
+  margin-left: auto; display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500; color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 6px 12px; border-radius: 999px;
+}
+.server-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.server-status[data-state="ok"] .server-dot { background: var(--success); }
+.server-status[data-state="error"] { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger); }
+.server-status[data-state="error"] .server-dot { background: var(--danger); }

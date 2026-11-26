@@ -1,0 +1,26 @@
+.icon-editor-row { display: flex; gap: 20px; align-items: flex-start; }
+.icon-editor-preview { flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 96px; }
+.icon-editor-preview canvas { width: 88px; height: 88px; border-radius: 24px; display: block; box-shadow: var(--shadow-md), inset 0 0 0 1px rgba(16, 24, 40, .06); }
+.icon-editor-name { font-size: 12px; color: var(--muted); max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.icon-editor-controls { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.icon-editor-controls .field-hint { margin-top: 0; }
+.icon-editor-options { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+
+.icon-drop {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  border: 1.5px dashed var(--border-strong); border-radius: var(--radius);
+  padding: 12px 14px; cursor: pointer; color: var(--muted); font-size: 13.5px;
+  background: var(--surface-2); transition: border-color .15s, background-color .15s;
+}
+.icon-drop:hover, .icon-drop.is-dragging { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+.icon-drop input { display: none; }
+.icon-drop-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.icon-drop.has-file { border-style: solid; color: var(--text-2); background: var(--surface); }
+.icon-drop-remove {
+  display: none; width: 26px; height: 26px; border-radius: 7px; border: 0; cursor: pointer;
+  background: var(--surface-2); color: var(--muted); place-items: center;
+}
+.icon-drop-remove:hover { background: var(--danger-soft); color: var(--danger); }
+.icon-drop.has-file .icon-drop-remove { display: grid; }
+
+@media (max-width: 560px) { .icon-editor-row { flex-direction: column; } }

@@ -1,0 +1,3 @@
+.build-panel .card-body { padding: 20px; }
+.build-button-icon { display: flex; }
+.build-panel-hint { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 12.5px; }

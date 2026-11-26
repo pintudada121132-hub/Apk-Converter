@@ -1,0 +1,8 @@
+.feature-group { margin-bottom: 20px; }
+.feature-group:last-child { margin-bottom: 0; }
+.feature-group-title {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font-size: 12px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.feature-group-title svg { color: var(--primary); }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }

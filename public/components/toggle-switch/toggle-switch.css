@@ -1,0 +1,29 @@
+.toggle {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; cursor: pointer; user-select: none;
+  transition: border-color .15s, background-color .15s;
+}
+.toggle:hover { border-color: var(--border-strong); }
+.toggle.is-on { border-color: var(--primary-line); background: var(--primary-soft); }
+.toggle.is-disabled { opacity: .5; cursor: not-allowed; }
+.toggle-input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.toggle-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.toggle-desc { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.toggle-badge {
+  font-size: 11px; font-weight: 600; margin-left: 6px; padding: 1px 7px; border-radius: 6px;
+  background: var(--success-soft); color: var(--success); border: 1px solid var(--success-line); vertical-align: 1px;
+}
+.toggle-track { flex: none; width: 36px; height: 20px; border-radius: 20px; background: var(--border-strong); position: relative; transition: background-color .15s; }
+.toggle-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, .2); transition: transform .15s;
+}
+.toggle.is-on .toggle-track { background: var(--primary); }
+.toggle.is-on .toggle-track::after { transform: translateX(16px); }
+.toggle-input:focus-visible ~ .toggle-track { box-shadow: var(--focus); }
+
+.toggle-compact { padding: 6px 10px; border-radius: 10px; gap: 8px; }
+.toggle-compact .toggle-title { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.toggle-compact.is-on { background: var(--surface); border-color: var(--border-strong); }

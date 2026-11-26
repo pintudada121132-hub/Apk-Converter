@@ -1,0 +1,31 @@
+body { background: var(--bg); }
+.install { max-width: 460px; margin: 0 auto; padding: 24px 16px calc(32px + env(safe-area-inset-bottom)); }
+
+.install-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  padding: 28px 20px 20px; display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.install-icon { width: 88px; height: 88px; border-radius: 24px; box-shadow: var(--shadow-md); margin-bottom: 14px; }
+.install-icon-letter { display: grid; place-items: center; background: var(--primary); color: #fff; font-size: 36px; font-weight: 700; }
+.install-card h1 { margin: 0; font-size: 22px; line-height: 1.25; }
+.install-meta { margin: 4px 0 20px; color: var(--muted); font-size: 14px; }
+.install-package { margin: 12px 0 0; color: var(--faint); font-size: 12px; word-break: break-all; }
+
+.install-steps { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; }
+.install-steps h2 { margin: 0 0 12px; font-size: 15px; }
+.install-steps ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.install-steps li { display: flex; gap: 12px; }
+.install-step-num { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.install-step-title { display: block; font-weight: 500; font-size: 14px; }
+.install-step-title b { font-weight: 700; }
+.install-step-desc { display: block; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+.install-state {
+  margin-top: 40px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--muted);
+}
+.install-state b { color: var(--text); font-size: 16px; }
+.install-state p { margin: 0 0 6px; font-size: 14px; line-height: 1.5; }
+.install-state-icon { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); margin-bottom: 4px; }
+.install-error .install-state-icon { background: var(--danger-soft); color: var(--danger); }
+.install-loading { flex-direction: row; justify-content: center; gap: 10px; }

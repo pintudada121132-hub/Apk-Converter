@@ -1,0 +1,25 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.card-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.card-step {
+  width: 28px; height: 28px; flex: none; border-radius: 8px;
+  display: grid; place-items: center;
+  background: var(--primary-soft); color: var(--primary);
+  font-size: 13px; font-weight: 700;
+}
+.card-titles { display: flex; flex-direction: column; min-width: 0; }
+.card-title { font-size: 15px; font-weight: 650; color: var(--text); }
+.card-subtitle { font-size: 13px; color: var(--muted); }
+.card-body { padding: 20px; }
+
+.card-collapsible > summary { list-style: none; cursor: pointer; border-bottom: 0; border-radius: var(--radius-lg); }
+.card-collapsible > summary::-webkit-details-marker { display: none; }
+.card-collapsible > summary:hover { background: var(--surface-2); }
+.card-collapsible[open] > summary { border-bottom: 1px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.card-chevron { margin-left: auto; color: var(--muted); display: flex; transition: transform .2s; }
+.card-collapsible[open] .card-chevron { transform: rotate(180deg); }

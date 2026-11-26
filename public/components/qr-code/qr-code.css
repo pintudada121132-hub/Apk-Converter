@@ -1,0 +1,3 @@
+.qr-code { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; display: inline-flex; }
+.qr-code canvas { display: block; image-rendering: pixelated; border-radius: 4px; }
+.qr-code-missing { width: 176px; height: 176px; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; }

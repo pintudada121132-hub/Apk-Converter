@@ -1,0 +1,12 @@
+.error-box {
+  display: flex; gap: 10px; margin-top: 14px;
+  background: var(--danger-soft); border: 1px solid var(--danger-line); border-radius: var(--radius);
+  padding: 12px 14px; color: #912018; font-size: 13.5px;
+}
+.error-box[hidden] { display: none; }
+.error-box-icon { color: var(--danger); display: flex; padding-top: 1px; }
+.error-box-body { flex: 1; min-width: 0; }
+.error-box-body b { display: block; color: var(--danger); }
+.error-box-body p { margin: 2px 0 0; }
+.error-box-body ul { margin: 4px 0 0; padding-left: 18px; }
+.error-box-retry { margin-top: 10px; }

@@ -1,0 +1,8 @@
+{
+  "name": "web2apk",
+  "version": "1.0.0",
+  "description": "Convert any website into a Kotlin Android APK with ad & redirect blocking",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "license": "MIT"
+}

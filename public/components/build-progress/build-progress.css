@@ -1,0 +1,27 @@
+.build-progress { margin-top: 18px; }
+.build-progress[hidden] { display: none; }
+.build-progress-top { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 500; margin-bottom: 8px; }
+.build-progress-time { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 400; }
+.build-progress-bar { height: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.build-progress-bar > div { height: 100%; width: 0; background: var(--primary); border-radius: 8px; transition: width .5s ease; }
+.build-progress.is-failed .build-progress-bar > div { background: var(--danger); }
+.build-progress.is-failed .build-progress-label { color: var(--danger); }
+
+.build-progress-stages { list-style: none; padding: 0; margin: 12px 0 0; display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--faint); }
+.build-progress-stages li { display: flex; align-items: center; gap: 6px; }
+.stage-dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: grid; place-items: center; color: transparent; background: var(--surface); }
+.build-progress-stages li.current { color: var(--primary); font-weight: 600; }
+.build-progress-stages li.current .stage-dot { border-color: var(--primary); }
+.build-progress-stages li.done { color: var(--text-2); }
+.build-progress-stages li.done .stage-dot { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.build-log-toggle { margin-top: 14px; background: none; border: 0; padding: 0; cursor: pointer; color: var(--muted); font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.build-log-toggle:hover { color: var(--text-2); }
+.build-log-toggle svg { transition: transform .15s; }
+.build-log-toggle.open svg { transform: rotate(90deg); }
+.build-log {
+  margin: 8px 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px; font: 11.5px/1.65 ui-monospace, "Cascadia Code", Consolas, monospace; color: var(--text-2);
+}
+@media (max-width: 520px) { .build-progress-stages { font-size: 0; } .stage-dot { font-size: 12px; } }

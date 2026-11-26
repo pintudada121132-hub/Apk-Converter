@@ -1,0 +1,17 @@
+builds/
+cache/
+keystore/
+template/.gradle/
+template/build/
+template/app/build/
+template/local.properties
+
+# personal notes
+Agent.txt
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+node_modules/

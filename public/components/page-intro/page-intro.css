@@ -1,0 +1,10 @@
+.page-intro { max-width: 1240px; margin: 0 auto; padding: 32px 24px 20px; }
+.page-intro h1 { margin: 0 0 6px; font-size: clamp(24px, 3vw, 30px); line-height: 1.2; letter-spacing: -.02em; font-weight: 700; }
+.page-intro p { margin: 0; color: var(--muted); font-size: 15.5px; }
+.page-intro-points { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.page-intro-points li {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  padding: 6px 12px; font-size: 13px; color: var(--text-2);
+}
+.page-intro-points svg { color: var(--primary); }
