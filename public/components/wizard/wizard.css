@@ -1,0 +1,94 @@
+/* clip (not hidden) keeps the rounded corners without breaking the sticky footer */
+.wizard { overflow: clip; scroll-margin-top: 84px; }
+
+/* ---- header: count, progress bar, step dots */
+.wizard-head { padding: 16px 20px 14px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.wizard-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.wizard-count { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+.wizard-count span { color: var(--muted); font-weight: 500; }
+.wizard-skip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: 0; padding: 2px 4px; border-radius: 6px; cursor: pointer;
+  color: var(--primary); font-size: 12.5px; font-weight: 600;
+}
+.wizard-skip:hover { background: var(--primary-soft); }
+.wizard-skip[hidden] { display: none; }
+
+.wizard-bar { height: 4px; border-radius: 4px; background: var(--border); overflow: hidden; margin-bottom: 14px; }
+.wizard-bar span { display: block; height: 100%; background: var(--primary); border-radius: 4px; transition: width .35s ease; }
+
+.wizard-steps { list-style: none; margin: 0; padding: 0; display: flex; justify-content: space-between; gap: 4px; }
+.wizard-steps li { flex: 1; min-width: 0; display: flex; justify-content: center; }
+.wizard-step {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; max-width: 100%;
+  background: none; border: 0; padding: 2px; cursor: pointer; border-radius: 8px; color: var(--muted);
+}
+.wizard-step:focus-visible { outline: none; box-shadow: var(--focus); }
+.wizard-step-dot {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface); border: 1.5px solid var(--border-strong); color: var(--faint);
+  transition: background-color .2s, border-color .2s, color .2s, transform .2s;
+}
+.wizard-step:hover .wizard-step-dot { border-color: var(--primary-line); color: var(--primary); }
+.wizard-step.is-done .wizard-step-dot { background: var(--primary-soft); border-color: var(--primary-line); color: var(--primary); }
+.wizard-step.is-current .wizard-step-dot { background: var(--primary); border-color: var(--primary); color: #fff; transform: scale(1.08); box-shadow: 0 0 0 4px rgba(37, 99, 235, .14); }
+.wizard-step-label { font-size: 11.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.wizard-step.is-current .wizard-step-label { color: var(--text); font-weight: 650; }
+@media (max-width: 760px) {
+  .wizard-step-label { display: none; }
+  .wizard-step-dot { width: 26px; height: 26px; }
+  .wizard-step-dot svg { width: 13px; height: 13px; }
+}
+
+/* ---- sliding panels */
+.wizard-viewport { position: relative; overflow: hidden; }
+.wizard-viewport.is-sliding { transition: height .32s cubic-bezier(.4, 0, .2, 1); }
+.wizard-panel { padding: 20px 20px 22px; }
+.wizard-panel[hidden] { display: none; }
+.wizard-panel.is-leaving { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
+.wizard-panel.is-entering.from-next { animation: wizard-in-right .32s cubic-bezier(.4, 0, .2, 1) both; }
+.wizard-panel.is-entering.from-prev { animation: wizard-in-left .32s cubic-bezier(.4, 0, .2, 1) both; }
+.wizard-panel.is-leaving.to-next { animation: wizard-out-left .32s cubic-bezier(.4, 0, .2, 1) both; }
+.wizard-panel.is-leaving.to-prev { animation: wizard-out-right .32s cubic-bezier(.4, 0, .2, 1) both; }
+@keyframes wizard-in-right { from { transform: translateX(14%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes wizard-in-left { from { transform: translateX(-14%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes wizard-out-left { from { transform: none; opacity: 1; } to { transform: translateX(-14%); opacity: 0; } }
+@keyframes wizard-out-right { from { transform: none; opacity: 1; } to { transform: translateX(14%); opacity: 0; } }
+
+.wizard-panel-head { margin-bottom: 18px; }
+.wizard-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; outline: none; }
+.wizard-subtitle { margin: 3px 0 0; color: var(--muted); font-size: 13.5px; }
+.wizard-defaults { margin: 6px 0 0; color: var(--faint); font-size: 12.5px; }
+.wizard-optional {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; letter-spacing: 0;
+  background: var(--surface-2); color: var(--muted); border: 1px solid var(--border);
+}
+
+/* the step components are cards on their own: drop their frame inside the wizard */
+.wizard-panel .card { background: none; border: 0; box-shadow: none; margin: 0; border-radius: 0; }
+.wizard-panel .card + .card { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
+.wizard-panel .card-head, .wizard-panel details > summary { display: none; }
+.wizard-panel .card-body { padding: 0; }
+
+/* ---- footer */
+.wizard-foot {
+  display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+  border-top: 1px solid var(--border); background: var(--surface-2);
+  position: sticky; bottom: 0; z-index: 5;   /* Back / Next stay on screen on long steps */
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.wizard-foot-msg { flex: 1; text-align: center; color: var(--danger); font-size: 12.5px; font-weight: 500; }
+.wizard-next[hidden] { display: none; }
+.wizard-back:disabled { visibility: hidden; }
+.wizard-next.is-shaking { animation: wizard-shake .4s; }
+@keyframes wizard-shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+@media (max-width: 520px) {
+  .wizard-foot { flex-wrap: wrap; }
+  .wizard-foot-msg { order: -1; flex-basis: 100%; }
+  .wizard-next { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wizard-bar span, .wizard-step-dot { transition: none; }
+  .wizard-next.is-shaking { animation: none; }
+}

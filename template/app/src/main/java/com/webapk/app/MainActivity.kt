@@ -2,13 +2,16 @@
 
 package com.webapk.app
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -31,7 +34,9 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.webkit.CookieManager
+import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.SslErrorHandler
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
@@ -55,6 +60,8 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import org.json.JSONObject
+import org.json.JSONTokener
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -67,7 +74,9 @@ class MainActivity : Activity() {
     private lateinit var progress: ProgressBar
     private lateinit var errorView: LinearLayout
     private var menuButton: ImageButton? = null
+    private var videoButton: ImageButton? = null   // own button for "Download video" when there is no floating menu
     private var siteList: View? = null
+    private lateinit var ads: Ads
 
     private var themeColor = Color.parseColor("#2563EB")
     private var desktopMode = false
@@ -87,10 +96,22 @@ class MainActivity : Activity() {
     private var clearHistoryOnLoad = false    // forget the previous site once the new one loads
     private val handler = Handler(Looper.getMainLooper())
 
+    // video download: .mp4 / .webm requests seen on the current page, and whether the page has a <video>
+    private val sniffedVideos: MutableSet<String> = java.util.Collections.synchronizedSet(LinkedHashSet())
+    private var pageHasVideoTag = false
+
+    // runtime permissions: request code -> what to do with the answer
+    private val permissionCallbacks = mutableMapOf<Int, (Map<String, Boolean>) -> Unit>()
+    private var nextPermissionRequest = 5000
+
+    private var wentToBackground = false
+    private var ignoreNextReturn = false      // came back from our own file picker / share sheet: no app-open ad
+
     private val prefs by lazy { getSharedPreferences("webapk", Context.MODE_PRIVATE) }
 
     companion object {
         private const val FILE_REQUEST = 4401
+        private val VIDEO_EXT = Regex("""\.(mp4|m4v|webm)$""", RegexOption.IGNORE_CASE)
         private const val DESKTOP_UA =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     }
@@ -115,9 +136,14 @@ class MainActivity : Activity() {
         if (cfg.keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (cfg.noScreenshot) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
 
+        ads = Ads(this, cfg.ads)
         buildLayout()
         setupWindow()
         setupWebView()
+
+        // ask for the chosen permissions first (if set to ask on start), so the ad consent form doesn't overlap
+        val startPerms = if (cfg.permissions.askOnStart && savedInstanceState == null) chosenPermissions() else emptyArray()
+        if (startPerms.isNotEmpty()) requestAppPermissions(startPerms) { ads.start() } else ads.start()
 
         val link = intent?.dataString?.takeIf { it.startsWith("http") }
         when {
@@ -141,18 +167,63 @@ class MainActivity : Activity() {
 
     private val isMultiSite get() = cfg.sites.size > 1
 
-    override fun onResume() { super.onResume(); web.onResume() }
+    override fun onResume() { super.onResume(); web.onResume(); ads.resume() }
 
     override fun onPause() {
         super.onPause()
         web.onPause()
+        ads.pause()
         CookieManager.getInstance().flush()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!wentToBackground) return
+        wentToBackground = false
+        if (ignoreNextReturn) ignoreNextReturn = false else ads.onReturnToApp()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) wentToBackground = true
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        ads.destroy()
         web.destroy()
         super.onDestroy()
+    }
+
+    // ---------------------------------------------------------------- runtime permissions
+
+    /** Dangerous permissions switched on in the builder (they are also the only ones in the manifest). */
+    private fun chosenPermissions(): Array<String> {
+        val p = mutableListOf<String>()
+        if (cfg.permissions.camera) p += Manifest.permission.CAMERA
+        if (cfg.permissions.microphone) p += Manifest.permission.RECORD_AUDIO
+        if (cfg.permissions.location) { p += Manifest.permission.ACCESS_FINE_LOCATION; p += Manifest.permission.ACCESS_COARSE_LOCATION }
+        return p.toTypedArray()
+    }
+
+    private fun hasPermission(p: String) = checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
+
+    /** Asks for the permissions that aren't granted yet, then calls [done] with permission -> granted. */
+    private fun requestAppPermissions(perms: Array<String>, done: (Map<String, Boolean>) -> Unit) {
+        val missing = perms.filter { !hasPermission(it) }
+        if (missing.isEmpty()) { done(perms.associateWith { true }); return }
+        val code = nextPermissionRequest++
+        permissionCallbacks[code] = { done(perms.associateWith { hasPermission(it) }) }
+        requestPermissions(missing.toTypedArray(), code)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        val cb = permissionCallbacks.remove(requestCode) ?: return super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        cb(emptyMap())
+    }
+
+    private fun permissionDenied(what: String) {
+        toast("$what permission is off. Turn it on in Settings › Apps › ${getString(R.string.app_name)} › Permissions")
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -247,12 +318,22 @@ class MainActivity : Activity() {
         if (isMultiSite) content.addView(buildSiteList().also { siteList = it },
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
 
-        if (cfg.floatingMenu) content.addView(buildMenuButton(), FrameLayout.LayoutParams(dp(46), dp(46)).apply {
+        val fabParams = { FrameLayout.LayoutParams(dp(46), dp(46)).apply {
             gravity = Gravity.BOTTOM or Gravity.END
             setMargins(0, 0, dp(16), dp(24))
-        })
+        } }
+        if (cfg.floatingMenu) content.addView(buildMenuButton(), fabParams())
+        else if (cfg.videoDownload) content.addView(buildVideoButton(), fabParams())
 
-        root.addView(content, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        // page + optional AdMob banner strip above or below it
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val banner = ads.bannerView()?.apply { setBackgroundColor(if (cfg.darkMode) Color.BLACK else Color.WHITE) }
+        val bannerOnTop = cfg.ads.bannerPosition == "top"
+        if (banner != null && bannerOnTop) column.addView(banner, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        column.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        if (banner != null && !bannerOnTop) column.addView(banner, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+
+        root.addView(column, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         setContentView(root)
 
         // Keep content clear of status bar, navigation bar, notch and keyboard.
@@ -270,17 +351,22 @@ class MainActivity : Activity() {
         }
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun buildMenuButton(): View {
+    private fun buildFab(iconRes: Int, label: String, onTap: (View) -> Unit): ImageButton {
         val btn = ImageButton(this).apply {
-            setImageResource(android.R.drawable.ic_menu_more)
+            setImageResource(iconRes)
             imageTintList = ColorStateList.valueOf(if (isLight(themeColor)) Color.BLACK else Color.WHITE)
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(themeColor) }
             alpha = 0.75f
             elevation = dp(6).toFloat()
-            contentDescription = "Menu"
+            contentDescription = label
         }
-        // draggable: move with finger, tap opens menu
+        makeDraggable(btn, onTap)
+        return btn
+    }
+
+    /** Move the button with a finger; a tap without moving runs [onTap]. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun makeDraggable(btn: View, onTap: (View) -> Unit) {
         var downX = 0f; var downY = 0f; var startX = 0f; var startY = 0f; var dragging = false
         btn.setOnTouchListener { v, e ->
             when (e.actionMasked) {
@@ -291,12 +377,27 @@ class MainActivity : Activity() {
                         dragging = true; v.translationX = startX + dx; v.translationY = startY + dy
                     }
                 }
-                MotionEvent.ACTION_UP -> if (!dragging) showMenu(v)
+                MotionEvent.ACTION_UP -> if (!dragging) onTap(v)
             }
             true
         }
-        menuButton = btn
-        return btn
+    }
+
+    private fun buildMenuButton(): View =
+        buildFab(android.R.drawable.ic_menu_more, "Menu") { showMenu(it) }.also { menuButton = it }
+
+    /** Shown instead of the menu when the floating menu is off; appears only on pages with a video. */
+    private fun buildVideoButton(): View =
+        buildFab(android.R.drawable.stat_sys_download, "Download video") { downloadVideo() }.also {
+            it.visibility = View.GONE
+            videoButton = it
+        }
+
+    /** Shows / hides the floating buttons (hidden on the site list and in fullscreen video). */
+    private fun updateFloatingButtons() {
+        val pageOnScreen = !showingList && customView == null
+        menuButton?.visibility = if (pageOnScreen) View.VISIBLE else View.GONE
+        videoButton?.visibility = if (pageOnScreen && (pageHasVideoTag || sniffedVideos.isNotEmpty())) View.VISIBLE else View.GONE
     }
 
     private fun showMenu(anchor: View) {
@@ -305,6 +406,7 @@ class MainActivity : Activity() {
         if (isMultiSite) m.add(0, 10, 0, "All sites")
         m.add(0, 1, 0, "Home")
         m.add(0, 2, 1, "Refresh")
+        if (cfg.videoDownload) m.add(0, 11, 1, "Download video")
         m.add(0, 3, 2, "Desktop mode").apply { isCheckable = true; isChecked = desktopMode }
         m.add(0, 4, 3, "Rotate screen")
         m.add(0, 5, 4, "Auto rotate")
@@ -317,6 +419,7 @@ class MainActivity : Activity() {
                 10 -> showSiteList()
                 1 -> web.loadUrl(homeUrl)
                 2 -> web.reload()
+                11 -> downloadVideo()
                 3 -> setDesktopMode(!desktopMode)
                 4 -> {
                     val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -324,9 +427,12 @@ class MainActivity : Activity() {
                     prefs.edit().putString("orientation", o).apply(); applyOrientation(o)
                 }
                 5 -> { prefs.edit().putString("orientation", "sensor").apply(); applyOrientation("sensor") }
-                6 -> startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"; putExtra(Intent.EXTRA_TEXT, web.url ?: cfg.url)
-                }, "Share"))
+                6 -> {
+                    ignoreNextReturn = true
+                    startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"; putExtra(Intent.EXTRA_TEXT, web.url ?: cfg.url)
+                    }, "Share"))
+                }
                 7 -> openExternal(Uri.parse(web.url ?: cfg.url))
                 8 -> {
                     web.clearCache(true); web.clearHistory()
@@ -407,6 +513,7 @@ class MainActivity : Activity() {
         s.javaScriptCanOpenWindowsAutomatically = !cfg.blockPopups
         s.setSupportMultipleWindows(true)
         s.cacheMode = if (cfg.cache) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_NO_CACHE
+        s.setGeolocationEnabled(cfg.permissions.location)
         defaultUserAgent = cfg.userAgent.ifBlank { s.userAgentString }
         s.userAgentString = if (desktopMode) DESKTOP_UA else defaultUserAgent
 
@@ -419,6 +526,7 @@ class MainActivity : Activity() {
 
         web.addJavascriptInterface(object {
             @JavascriptInterface fun setScrollUp(v: Boolean) { jsCanScrollUp = v }
+            @JavascriptInterface fun setHasVideo(v: Boolean) { handler.post { pageHasVideoTag = v; updateFloatingButtons() } }
         }, "__webapk")
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -474,10 +582,23 @@ class MainActivity : Activity() {
             if (!m) { m = document.createElement('meta'); m.name = 'viewport'; document.head && document.head.appendChild(m); }
             m.setAttribute('content', 'width=1280');
         """ else ""
+        // tells the app whether the page has a video, so the "Download video" button can appear
+        val videoJs = if (cfg.videoDownload && !cfg.floatingMenu) """
+            if (!window.__webapkVideoWatch) {
+              window.__webapkVideoWatch = true;
+              var had = null;
+              var check = function(){
+                var v = !!document.querySelector('video, a[href*=".mp4"], a[href*=".webm"]');
+                if (v !== had) { had = v; if (window.__webapk) __webapk.setHasVideo(v); }
+              };
+              check(); setInterval(check, 2000);
+            }
+        """ else ""
         return """
             (function(){
               try {
                 $desktopJs
+                $videoJs
                 if (!document.getElementById('__webapk_css')) {
                   var st = document.createElement('style'); st.id = '__webapk_css';
                   st.textContent = `$css`;
@@ -494,6 +615,10 @@ class MainActivity : Activity() {
             if (cfg.adBlock && AdBlocker.isBlockedWaiting(request.url.host) && !isInternal(request.url.host)) {
                 return AdBlocker.emptyResponse()
             }
+            if (cfg.videoDownload && isVideoFile(request.url)) {
+                val url = request.url.toString()
+                if (sniffedVideos.size < 50 && sniffedVideos.add(url)) handler.post { updateFloatingButtons() }
+            }
             return null
         }
 
@@ -504,6 +629,9 @@ class MainActivity : Activity() {
 
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
             errorView.visibility = View.GONE
+            sniffedVideos.clear()       // new page: forget the previous page's videos
+            pageHasVideoTag = false
+            updateFloatingButtons()
             if (showingList) return
             if (cfg.progressBar) progress.visibility = View.VISIBLE
             if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -522,7 +650,10 @@ class MainActivity : Activity() {
                 initialLoad = false
             }
             view.evaluateJavascript(pageFinishedScript(), null)
+            if (lastCountedPage != url) { lastCountedPage = url; ads.onPageLoaded() }
         }
+
+        private var lastCountedPage: String? = null
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (request.isForMainFrame && !showingList) {
@@ -566,9 +697,44 @@ class MainActivity : Activity() {
             fileCallback?.onReceiveValue(null)
             fileCallback = callback
             return try {
+                ignoreNextReturn = true
                 startActivityForResult(params.createIntent(), FILE_REQUEST); true
             } catch (e: ActivityNotFoundException) {
+                ignoreNextReturn = false
                 fileCallback = null; false
+            }
+        }
+
+        /** Camera / microphone for the site (video calls, voice notes, QR scanners...). */
+        override fun onPermissionRequest(request: PermissionRequest) {
+            val wanted = mutableListOf<String>()     // WebView resources we may grant
+            val needed = mutableListOf<String>()     // Android permissions they need
+            for (r in request.resources) when (r) {
+                PermissionRequest.RESOURCE_VIDEO_CAPTURE -> if (cfg.permissions.camera) { wanted += r; needed += Manifest.permission.CAMERA }
+                PermissionRequest.RESOURCE_AUDIO_CAPTURE -> if (cfg.permissions.microphone) { wanted += r; needed += Manifest.permission.RECORD_AUDIO }
+                PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID -> wanted += r   // DRM video, needs no permission
+            }
+            if (wanted.isEmpty()) { request.deny(); return }
+            requestAppPermissions(needed.toTypedArray()) { granted ->
+                val ok = wanted.filter {
+                    when (it) {
+                        PermissionRequest.RESOURCE_VIDEO_CAPTURE -> granted[Manifest.permission.CAMERA] == true
+                        PermissionRequest.RESOURCE_AUDIO_CAPTURE -> granted[Manifest.permission.RECORD_AUDIO] == true
+                        else -> true
+                    }
+                }
+                if (ok.size < wanted.size) permissionDenied(if (granted[Manifest.permission.CAMERA] == false) "Camera" else "Microphone")
+                if (ok.isEmpty()) request.deny() else request.grant(ok.toTypedArray())
+            }
+        }
+
+        /** navigator.geolocation */
+        override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
+            if (!cfg.permissions.location) { callback.invoke(origin, false, false); return }
+            requestAppPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) { granted ->
+                val ok = granted.values.any { it }
+                if (!ok) permissionDenied("Location")
+                callback.invoke(origin, ok, false)
             }
         }
 
@@ -578,7 +744,7 @@ class MainActivity : Activity() {
             customViewCallback = callback
             root.setPadding(0, 0, 0, 0)
             root.addView(view, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-            menuButton?.visibility = View.GONE
+            updateFloatingButtons()
             hideSystemBars(true)
         }
 
@@ -591,7 +757,7 @@ class MainActivity : Activity() {
         customView = null
         customViewCallback?.onCustomViewHidden()
         customViewCallback = null
-        menuButton?.visibility = View.VISIBLE
+        updateFloatingButtons()
         if (!cfg.fullscreen) hideSystemBars(false)
         root.requestApplyInsets()
     }
@@ -606,7 +772,7 @@ class MainActivity : Activity() {
         swipe.isRefreshing = false
         progress.visibility = View.GONE
         errorView.visibility = View.GONE
-        menuButton?.visibility = View.GONE
+        updateFloatingButtons()
         list.visibility = View.VISIBLE
     }
 
@@ -616,7 +782,7 @@ class MainActivity : Activity() {
         initialLoad = true
         clearHistoryOnLoad = true   // back from this site's first page returns to the list
         siteList?.visibility = View.GONE
-        menuButton?.visibility = View.VISIBLE
+        updateFloatingButtons()
         web.loadUrl(site.url)
     }
 
@@ -772,13 +938,25 @@ class MainActivity : Activity() {
 
     private fun download(url: String, ua: String?, disposition: String?, mime: String?) {
         if (!url.startsWith("http")) { toast("This download type is not supported"); return }
-        if (Build.VERSION.SDK_INT < 29) { openExternal(Uri.parse(url)); return }
+        enqueueDownload(url, URLUtil.guessFileName(url, disposition, mime), mime, ua)
+    }
+
+    /** Saves [url] to the Downloads folder with Android's download manager (progress in the notification bar). */
+    private fun enqueueDownload(url: String, name: String, mime: String?, ua: String?, referer: String? = null) {
+        if (Build.VERSION.SDK_INT < 29 && !hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            // Android 8-9 need the storage permission to write to Downloads
+            requestAppPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)) { granted ->
+                if (granted.values.all { it }) enqueueDownload(url, name, mime, ua, referer)
+                else { permissionDenied("Storage"); openExternal(Uri.parse(url)) }
+            }
+            return
+        }
         try {
-            val name = URLUtil.guessFileName(url, disposition, mime)
             val req = DownloadManager.Request(Uri.parse(url)).apply {
                 mime?.let { setMimeType(it) }
                 CookieManager.getInstance().getCookie(url)?.let { addRequestHeader("Cookie", it) }
                 ua?.let { addRequestHeader("User-Agent", it) }
+                referer?.let { addRequestHeader("Referer", it) }
                 setTitle(name)
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
@@ -788,6 +966,79 @@ class MainActivity : Activity() {
         } catch (e: Exception) {
             openExternal(Uri.parse(url))
         }
+    }
+
+    // ---------------------------------------------------------------- video download
+
+    private fun isVideoFile(uri: Uri): Boolean {
+        val path = uri.path ?: return false
+        return (uri.scheme == "http" || uri.scheme == "https") && VIDEO_EXT.containsMatchIn(path)
+    }
+
+    /** Finds the videos on the page (video tags, links, og:video and .mp4 requests) and offers to download one. */
+    private fun downloadVideo() {
+        if (showingList) { toast("Open a site first"); return }
+        val findScript = """
+            (function(){
+              var out = [], seen = {}, blob = false, stream = false;
+              function add(u){
+                if (!u) return;
+                try { u = new URL(u, location.href).href; } catch(e) { return; }
+                if (/^blob:/i.test(u)) { blob = true; return; }
+                if (!/^https?:/i.test(u) || seen[u]) return;
+                if (/\.(m3u8|mpd)(\?|#|$)/i.test(u)) { stream = true; return; }
+                seen[u] = 1; out.push(u);
+              }
+              document.querySelectorAll('video').forEach(function(v){
+                add(v.currentSrc); add(v.getAttribute('src'));
+                v.querySelectorAll('source').forEach(function(s){ add(s.getAttribute('src')); });
+              });
+              document.querySelectorAll('a[href]').forEach(function(a){ if (/\.(mp4|m4v|webm)(\?|#|$)/i.test(a.href)) add(a.href); });
+              document.querySelectorAll('meta[property^="og:video"]').forEach(function(m){ if (/^https?:/i.test(m.content)) add(m.content); });
+              return JSON.stringify({ urls: out, blob: blob, stream: stream, title: document.title || '' });
+            })();
+        """.trimIndent()
+        web.evaluateJavascript(findScript) { raw ->
+            val found = LinkedHashSet<String>()
+            var streamed = false
+            var title = ""
+            runCatching {
+                val o = JSONObject(JSONTokener(raw).nextValue() as String)
+                val arr = o.getJSONArray("urls")
+                for (i in 0 until arr.length()) found += arr.getString(i)
+                streamed = o.optBoolean("blob") || o.optBoolean("stream")
+                title = o.optString("title")
+            }
+            synchronized(sniffedVideos) { found += sniffedVideos }
+            val urls = found.toList()
+            when {
+                urls.isEmpty() && streamed -> toast("This video is streamed in small pieces and can't be downloaded")
+                urls.isEmpty() -> toast("No video found on this page. Play the video, then try again.")
+                else -> chooseVideo(urls, title)
+            }
+        }
+    }
+
+    private fun chooseVideo(urls: List<String>, pageTitle: String) {
+        val labels = urls.map { u ->
+            val uri = Uri.parse(u)
+            "${uri.lastPathSegment ?: "video"}\n${uri.host?.removePrefix("www.") ?: ""}"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(if (urls.size == 1) "Download this video?" else "Choose a video to download")
+            .setItems(labels) { _, which -> startVideoDownload(urls[which], pageTitle) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun startVideoDownload(url: String, pageTitle: String) {
+        val uri = Uri.parse(url)
+        val ext = VIDEO_EXT.find(uri.path ?: "")?.groupValues?.get(1)?.lowercase() ?: "mp4"
+        // name it after the page ("My video.mp4") rather than "videoplayback.mp4"
+        val base = pageTitle.replace(Regex("""[\\/:*?"<>|\r\n\t]+"""), " ").trim().take(80)
+            .ifEmpty { URLUtil.guessFileName(url, null, "video/$ext").substringBeforeLast('.') }
+        val mime = if (ext == "webm") "video/webm" else "video/mp4"
+        enqueueDownload(url, "$base.$ext", mime, web.settings.userAgentString, web.url)
     }
 
     private fun toast(msg: String) {

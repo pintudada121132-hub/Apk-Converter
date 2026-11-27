@@ -145,7 +145,46 @@ function validate(b) {
   if (!/^[\w.\-]{1,20}$/.test(b.versionName || '')) errors.push('Invalid version name (e.g. 1.0.0)');
   if (b.config.themeColor && !/^#[0-9a-fA-F]{6}$/.test(b.config.themeColor)) errors.push('Invalid theme color');
   if (b.iconBg && !/^#[0-9a-fA-F]{6}$/.test(b.iconBg)) errors.push('Invalid icon color');
+  const p = b.config.permissions;
+  if (p !== undefined && (typeof p !== 'object' || p === null || Array.isArray(p))) errors.push('Invalid permissions');
+  const ads = b.config.ads;
+  if (ads !== undefined && (typeof ads !== 'object' || ads === null || Array.isArray(ads))) errors.push('Invalid ad settings');
+  else if (ads && ads.enabled) {
+    if (!ADMOB_APP_ID.test(ads.appId || '')) errors.push('AdMob app ID looks wrong (ca-app-pub-0000000000000000~0000000000)');
+    const units = [['bannerId', 'Banner'], ['interstitialId', 'Interstitial'], ['appOpenId', 'App open']];
+    for (const [key, label] of units) {
+      if (ads[key] && !ADMOB_UNIT_ID.test(ads[key])) errors.push(`${label} ad unit ID looks wrong (ca-app-pub-0000000000000000/0000000000)`);
+    }
+    if (!units.some(([key]) => ads[key])) errors.push('Add at least one ad unit ID');
+    if (!['top', 'bottom'].includes(ads.bannerPosition || 'bottom')) errors.push('Invalid banner position');
+    if (!Number.isInteger(ads.interstitialEvery ?? 5) || ads.interstitialEvery < 1 || ads.interstitialEvery > 100) errors.push('Interstitial frequency must be 1-100 pages');
+    if (!Number.isInteger(ads.interstitialSeconds ?? 60) || ads.interstitialSeconds < 0 || ads.interstitialSeconds > 3600) errors.push('Interstitial gap must be 0-3600 seconds');
+  }
   return errors;
+}
+
+const ADMOB_APP_ID = /^ca-app-pub-\d{10,20}~\d{6,12}$/;
+const ADMOB_UNIT_ID = /^ca-app-pub-\d{10,20}\/\d{6,12}$/;
+
+/** Adds the chosen permissions (and the AdMob app ID) to the generated app's AndroidManifest.xml. */
+async function writeManifest(file, config) {
+  const p = config.permissions || {};
+  const perm = (name, extra = '') => `    <uses-permission android:name="android.permission.${name}"${extra} />`;
+  const lines = [];
+  if (p.camera) lines.push(perm('CAMERA'), '    <uses-feature android:name="android.hardware.camera" android:required="false" />');
+  if (p.microphone) lines.push(perm('RECORD_AUDIO'), perm('MODIFY_AUDIO_SETTINGS'));
+  if (p.location) lines.push(perm('ACCESS_FINE_LOCATION'), perm('ACCESS_COARSE_LOCATION'),
+    '    <uses-feature android:name="android.hardware.location" android:required="false" />');
+  // Android 8-9 need this to save downloads to the Downloads folder (newer versions don't)
+  if (config.downloads !== false || config.videoDownload) lines.push(perm('WRITE_EXTERNAL_STORAGE', ' android:maxSdkVersion="28"'));
+
+  const meta = config.ads && config.ads.enabled
+    ? `        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="${config.ads.appId}" />`
+    : '';
+  let xml = await fsp.readFile(file, 'utf8');
+  xml = xml.replace(/^[ \t]*<!-- WEBAPK_PERMISSIONS:.*-->$/m, lines.join('\n'))
+    .replace(/^[ \t]*<!-- WEBAPK_META:.*-->$/m, meta);
+  await fsp.writeFile(file, xml);
 }
 
 async function runBuild(job) {
@@ -162,6 +201,9 @@ async function runBuild(job) {
 
     await fsp.writeFile(path.join(proj, 'local.properties'), 'sdk.dir=' + SDK.replace(/\\/g, '\\\\').replace(/:/g, '\\:') + '\n');
     await fsp.writeFile(path.join(main, 'assets', 'config.json'), JSON.stringify(body.config, null, 2));
+    await writeManifest(path.join(main, 'AndroidManifest.xml'), body.config);
+    const withAds = !!(body.config.ads && body.config.ads.enabled);
+    if (withAds) log('AdMob ads added (the first build with ads downloads the Google Mobile Ads SDK)');
     await fsp.writeFile(path.join(main, 'res', 'values', 'strings.xml'),
       `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">${xmlEscape(body.appName)}</string>\n</resources>\n`);
     await fsp.writeFile(path.join(main, 'res', 'values', 'colors.xml'),
@@ -186,7 +228,8 @@ async function runBuild(job) {
     const args = ['assembleRelease', '--console=plain',
       `-Pwebapk.appId=${body.packageName}`, `-Pwebapk.versionCode=${body.versionCode}`,
       `-Pwebapk.versionName=${body.versionName}`, `-Pwebapk.storeFile=${ks.file}`,
-      `-Pwebapk.storePassword=${ks.pass}`, `-Pwebapk.keyAlias=${ks.alias}`, `-Pwebapk.keyPassword=${ks.pass}`];
+      `-Pwebapk.storePassword=${ks.pass}`, `-Pwebapk.keyAlias=${ks.alias}`, `-Pwebapk.keyPassword=${ks.pass}`,
+      `-Pwebapk.ads=${withAds}`];
     log('Compiling Kotlin & building APK (first build may take a few minutes)...');
     await new Promise((resolve, reject) => {
       const q = (a) => (IS_WIN && /\s/.test(a) ? `"${a}"` : a);

@@ -1,0 +1,18 @@
+.permission-fields { margin-top: 16px; }
+.permission-fields[hidden] { display: none; }
+.permission-auto { margin-top: 14px; }
+
+.permission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.permission-icon {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--surface-2); color: var(--muted); border: 1px solid var(--border);
+  transition: background-color .15s, color .15s, border-color .15s;
+}
+.toggle.is-on .permission-icon { background: var(--surface); color: var(--primary); border-color: var(--primary-line); }
+
+.permission-ask { max-width: 320px; }
+.permission-ask.is-disabled { opacity: .55; }
+
+.permission-note { display: flex; gap: 8px; margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.permission-note svg { margin-top: 2px; }

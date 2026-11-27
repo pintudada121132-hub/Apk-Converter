@@ -3,13 +3,13 @@ import { Card } from '../card/card.js';
 import { ColorPicker } from '../color-picker/color-picker.js';
 
 // Step 4: rotation, external link handling, theme color.
-const ORIENTATION = [
+export const ORIENTATION = [
   ['auto', 'Follow phone setting'],
   ['sensor', 'Always rotate'],
   ['portrait', 'Lock to portrait'],
   ['landscape', 'Lock to landscape'],
 ];
-const EXTERNAL = [
+export const EXTERNAL = [
   ['browser', 'Open in the phone\'s browser'],
   ['inside', 'Open inside the app'],
   ['block', 'Block them'],

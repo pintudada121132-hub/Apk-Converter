@@ -4,14 +4,15 @@ import { FEATURE_GROUPS } from '../../config/features.js';
 import { Card } from '../card/card.js';
 import { ToggleSwitch } from '../toggle-switch/toggle-switch.js';
 
-// Step 3: all feature switches, grouped.
-export function FeatureCard(store) {
+// Feature switches, grouped. groups: titles of the groups to show (default: all of them).
+export function FeatureCard(store, { groups } = {}) {
   const { root, body } = Card({ step: 3, title: 'Features', subtitle: 'You can change these again in any later build' });
+  const shown = groups ? FEATURE_GROUPS.filter((g) => groups.includes(g.title)) : FEATURE_GROUPS;
 
-  for (const group of FEATURE_GROUPS) {
+  for (const group of shown) {
     const section = el(`
       <div class="feature-group">
-        <div class="feature-group-title">${icon(group.icon, 15)}<span>${esc(group.title)}</span></div>
+        ${shown.length > 1 ? `<div class="feature-group-title">${icon(group.icon, 15)}<span>${esc(group.title)}</span></div>` : ''}
         <div class="feature-grid"></div>
       </div>`);
     const grid = section.querySelector('.feature-grid');

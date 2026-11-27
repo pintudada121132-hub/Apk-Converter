@@ -11,7 +11,8 @@ const POLL_MS = 1000;
 const MAX_POLL_FAILURES = 5;
 
 // Build button + the whole build flow: validate → send → progress → success (QR) or error (retry).
-export function BuildPanel(store) {
+// onFieldErrors(fieldErrors): lets the wizard open the step that has the wrong field first.
+export function BuildPanel(store, { onFieldErrors } = {}) {
   const root = el(`
     <section class="card build-panel">
       <div class="card-body">
@@ -73,6 +74,10 @@ export function BuildPanel(store) {
       store.set({ fieldErrors });
       errors.show({ title: 'Please fix the highlighted fields', messages: Object.values(fieldErrors) });
       showingFieldErrors = true;
+      if (onFieldErrors) {
+        onFieldErrors(fieldErrors);
+        return;   // the wizard shows the field on its own step
+      }
       scrollToFirstError(fieldErrors);
       return;
     }
@@ -125,7 +130,7 @@ export function BuildPanel(store) {
     result.hide();
     const code = (parseInt(store.get().versionCode, 10) || 1) + 1;
     store.set({ versionCode: String(code) });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    root.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   button.addEventListener('click', run);

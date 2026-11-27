@@ -30,6 +30,22 @@ export const initialState = {
   customCss: '',
   customJs: '',
 
+  // Phone features the website may use (optional, off by default). Only these go into the app's manifest.
+  permissions: { enabled: false, camera: false, microphone: false, location: false, askOnStart: false },
+
+  // AdMob. Empty unit IDs switch that ad type off.
+  ads: {
+    enabled: false,
+    appId: '',
+    bannerId: '',
+    bannerPosition: 'bottom',
+    interstitialId: '',
+    interstitialEvery: '5',
+    interstitialSeconds: '60',
+    appOpenId: '',
+    consent: false,
+  },
+
   previewLandscape: false,
   previewDesktop: false,
 

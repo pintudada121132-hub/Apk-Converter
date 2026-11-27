@@ -27,7 +27,9 @@ export function PhonePreview(store) {
               <iframe class="phone-frame" title="Website preview" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
               <div class="phone-empty">${icon('globe', 40, 1.5)}<b>No preview yet</b><span>Enter a website link and press Preview</span></div>
               <div class="phone-loading" hidden><span class="spinner dark"></span></div>
-              <div class="phone-fab"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div>
+              <div class="phone-ad" hidden><span class="phone-ad-badge">Ad</span><span>Banner ad</span></div>
+              <div class="phone-fab phone-fab-video" title="Download video">${icon('download', 18)}</div>
+              <div class="phone-fab phone-fab-menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div>
             </div>
           </div>
         </div>
@@ -41,7 +43,10 @@ export function PhonePreview(store) {
   const statusbar = root.querySelector('.phone-statusbar');
   const empty = root.querySelector('.phone-empty');
   const loading = root.querySelector('.phone-loading');
-  const fab = root.querySelector('.phone-fab');
+  const fab = root.querySelector('.phone-fab-menu');
+  const videoFab = root.querySelector('.phone-fab-video');
+  const adStrip = root.querySelector('.phone-ad');
+  const AD_H = 30;
   let loadedUrl = '';
 
   root.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
@@ -62,19 +67,31 @@ export function PhonePreview(store) {
 
     const W = land ? 560 : 280;
     const H = land ? 280 : 560;
-    const top = full ? 0 : 24;
+    const bar = full ? 0 : 24;
+    const banner = s.ads.enabled && !!s.ads.bannerId.trim();
+    const bannerTop = banner && s.ads.bannerPosition === 'top';
+    const top = bar + (bannerTop ? AD_H : 0);
+    const bottom = banner && !bannerTop ? AD_H : 0;
+    adStrip.hidden = !banner;
+    adStrip.style.top = bannerTop ? bar + 'px' : '';
+    adStrip.style.bottom = bannerTop ? '' : '0';
     statusbar.hidden = full;
     statusbar.style.background = s.themeColor;
     statusbar.style.color = onColor(s.themeColor);
 
     const viewport = s.previewDesktop ? 1280 : (land ? 740 : 375);
     const scale = W / viewport;
-    Object.assign(frame.style, { top: top + 'px', width: viewport + 'px', height: (H - top) / scale + 'px', transform: `scale(${scale})` });
+    Object.assign(frame.style, { top: top + 'px', width: viewport + 'px', height: (H - top - bottom) / scale + 'px', transform: `scale(${scale})` });
     empty.style.top = loading.style.top = top + 'px';
 
     fab.hidden = !s.features.floatingMenu;
-    fab.style.background = s.themeColor;
-    fab.style.color = onColor(s.themeColor);
+    // with the menu off, "Download video" gets its own button
+    videoFab.hidden = s.features.floatingMenu || !s.features.videoDownload;
+    for (const b of [fab, videoFab]) {
+      b.style.background = s.themeColor;
+      b.style.color = onColor(s.themeColor);
+      b.style.bottom = 18 + bottom + 'px';
+    }
 
     if (s.previewUrl && s.previewUrl !== loadedUrl) {
       loadedUrl = s.previewUrl;

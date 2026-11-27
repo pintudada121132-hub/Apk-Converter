@@ -31,5 +31,14 @@
 .phone-fab { position: absolute; z-index: 3; right: 14px; bottom: 18px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; opacity: .9; box-shadow: var(--shadow-md); }
 .phone-fab[hidden] { display: none; }
 
+.phone-ad {
+  position: absolute; z-index: 2; left: 0; right: 0; height: 30px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: #f2f4f7; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  color: var(--muted); font-size: 11px; font-weight: 500;
+}
+.phone-ad[hidden] { display: none; }
+.phone-ad-badge { background: #fdb022; color: #fff; font-size: 9.5px; font-weight: 700; padding: 0 4px; border-radius: 3px; }
+
 .phone-note { display: flex; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
 .phone-note svg { margin-top: 2px; }

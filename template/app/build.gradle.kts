@@ -4,6 +4,9 @@ plugins {
 
 fun prop(key: String, def: String): String = (project.findProperty(key) as String?)?.takeIf { it.isNotBlank() } ?: def
 
+// AdMob is compiled in only when the app uses ads, so apps without ads stay small.
+val adsEnabled = prop("webapk.ads", "false") == "true"
+
 android {
     namespace = "com.webapk.app"
     compileSdk = 35
@@ -38,6 +41,14 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("main") {
+            val adsDir = if (adsEnabled) "src/ads/java" else "src/noads/java"
+            java.srcDir(adsDir)
+            kotlin.srcDir(adsDir)
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -47,4 +58,8 @@ android {
 dependencies {
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.webkit:webkit:1.12.1")
+    if (adsEnabled) {
+        implementation("com.google.android.gms:play-services-ads:25.5.0")
+        implementation("com.google.android.ump:user-messaging-platform:4.0.0")
+    }
 }

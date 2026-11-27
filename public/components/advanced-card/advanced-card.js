@@ -1,7 +1,7 @@
 import { el } from '../../utils/dom.js';
 import { Card } from '../card/card.js';
 
-// Step 5 (collapsed): allowed domains, user agent, custom CSS / JS.
+// Step 7 (collapsed): allowed domains, user agent, custom CSS / JS.
 const FIELDS = [
   { key: 'allowedDomains', label: 'Allowed domains', placeholder: 'accounts.google.com, checkout.stripe.com',
     hint: 'Comma-separated. These always open inside the app and are never blocked as redirects or pop-ups. Add login and payment sites here.' },
@@ -13,7 +13,7 @@ const CODE = [
 ];
 
 export function AdvancedCard(store) {
-  const { root, body } = Card({ step: 5, title: 'Advanced', subtitle: 'Optional: allowed domains, user agent, custom code', collapsible: true });
+  const { root, body } = Card({ step: 7, title: 'Advanced', subtitle: 'Optional: allowed domains, user agent, custom code', collapsible: true });
 
   const make = (f, tag) => {
     const field = el(`

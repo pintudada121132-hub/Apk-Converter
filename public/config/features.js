@@ -18,6 +18,7 @@ export const FEATURE_GROUPS = [
       { key: 'floatingMenu', title: 'Floating menu button', desc: 'Home, refresh, desktop mode, rotate, share', default: true },
       { key: 'doubleBackExit', title: 'Press back twice to exit', desc: 'Prevents closing the app by accident', default: true },
       { key: 'downloads', title: 'File downloads', desc: 'Saves files to the Downloads folder', default: true },
+      { key: 'videoDownload', title: 'Video download', desc: 'Saves MP4 videos with the download manager. In the floating menu, or its own button when the menu is off', default: false },
       { key: 'fileUpload', title: 'File uploads', desc: 'Lets the site pick photos and files', default: true },
     ],
   },
